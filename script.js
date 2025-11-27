@@ -58,6 +58,7 @@ const timeUpOkBtn = document.getElementById('timeUpOkBtn');
 // State
 let draggedItem = null;
 let currentTheme = 'snow';
+let currentModel = null; // Store selected model
 let particles = [];
 
 // Pomodoro State
@@ -98,6 +99,7 @@ const modelBtns = document.querySelectorAll('.model-btn');
 modelBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         const model = btn.dataset.model;
+        currentModel = model; // Update state
 
         // Apply scaling based on model
         if (model === 'iphone-15' || model === 'iphone-16') {
@@ -109,6 +111,8 @@ modelBtns.forEach(btn => {
         // Show Intro Page
         modelSelectionPage.classList.add('hidden');
         introPage.classList.remove('hidden');
+
+        saveData(); // Save selection
     });
 });
 
@@ -577,6 +581,7 @@ function saveData() {
     const data = {
         tasks,
         theme: currentTheme,
+        model: currentModel, // Save model
         timer: {
             timeLeft: timeLeft,
             isMusicOn: isMusicOn
@@ -622,6 +627,20 @@ function loadData() {
                 isMusicOn = data.timer.isMusicOn;
                 musicToggleBtn.textContent = isMusicOn ? '[MUSIC: ON]' : '[MUSIC: OFF]';
             }
+        }
+
+        // Load Device Model
+        if (data.model) {
+            currentModel = data.model;
+            // Apply scaling
+            if (currentModel === 'iphone-15' || currentModel === 'iphone-16') {
+                document.body.classList.add('scale-compact');
+            } else {
+                document.body.classList.remove('scale-compact');
+            }
+            // Skip selection screen
+            modelSelectionPage.classList.add('hidden');
+            introPage.classList.remove('hidden');
         }
 
     } catch (e) {
