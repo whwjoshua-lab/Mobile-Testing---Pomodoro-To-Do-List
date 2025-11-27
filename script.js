@@ -140,6 +140,7 @@ saveTaskBtn.addEventListener('click', () => {
     const text = taskInput.value.trim();
     if (text) {
         createTaskElement(text, todoList);
+        saveData(); // Save after adding
         taskModal.classList.add('hidden');
         taskInput.value = '';
     }
@@ -158,6 +159,7 @@ function createTaskElement(text, parent) {
     deleteBtn.onclick = (e) => {
         e.stopPropagation(); // Prevent drag start
         div.remove();
+        saveData(); // Save after deleting
     };
 
     div.appendChild(deleteBtn);
@@ -212,6 +214,7 @@ function createTaskElement(text, parent) {
             const targetList = elemBelow.closest('.column')?.querySelector('.task-list');
             if (targetList) {
                 targetList.appendChild(div);
+                saveData(); // Save after mobile drop
             }
         }
         draggedItem = null;
@@ -231,6 +234,7 @@ function drop(ev) {
     const targetList = ev.target.closest('.column').querySelector('.task-list');
     if (targetList && draggedItem) {
         targetList.appendChild(draggedItem);
+        saveData(); // Save after desktop drop
     }
 }
 
@@ -255,6 +259,11 @@ function updateDisplay() {
     } else {
         minutesEl.textContent = time.m;
         secondsEl.textContent = time.s;
+    }
+    // Save data on every display update (tick) to capture running time
+    // This ensures we don't lose time if the browser crashes or beforeunload fails
+    if (isRunning) {
+        saveData();
     }
 }
 
@@ -309,6 +318,7 @@ function resetTimer() {
     pauseTimer();
     timeLeft = TIMER_DEFAULT;
     updateDisplay();
+    saveData(); // Save on reset
 }
 
 startPauseBtn.addEventListener('click', () => {
@@ -328,6 +338,7 @@ musicToggleBtn.addEventListener('click', () => {
         if (isMusicOn) bgm.play().catch(e => { });
         else bgm.pause();
     }
+    saveData(); // Save music preference
 });
 
 document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -337,6 +348,7 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
         pauseTimer();
         timeLeft = minutes * 60;
         updateDisplay();
+        saveData(); // Save preset selection
     });
 });
 
@@ -407,6 +419,7 @@ modalSetBtn.addEventListener('click', () => {
         pauseTimer();
         timeLeft = totalSeconds;
         updateDisplay();
+        saveData(); // Save custom time
         customTimerModal.classList.add('hidden');
     } else {
         alert("Please set a time greater than 0.");
@@ -546,10 +559,83 @@ document.querySelectorAll('.theme-card').forEach(card => {
         // Set theme
         currentTheme = card.dataset.theme;
         initParticles();
+        saveData(); // Save theme change
     });
 });
 
+// --- Persistence ---
+
+function saveData() {
+    const tasks = [];
+    document.querySelectorAll('.task-card').forEach(card => {
+        // Get the text content of the first child (the text node), ignoring the button
+        const text = card.firstChild ? card.firstChild.textContent : '';
+        const columnId = card.parentElement.id;
+        tasks.push({ text, columnId });
+    });
+
+    const data = {
+        tasks,
+        theme: currentTheme,
+        timer: {
+            timeLeft: timeLeft,
+            isMusicOn: isMusicOn
+        }
+    };
+
+    localStorage.setItem('tranquilityData', JSON.stringify(data));
+}
+
+function loadData() {
+    const dataStr = localStorage.getItem('tranquilityData');
+    if (!dataStr) return;
+
+    try {
+        const data = JSON.parse(dataStr);
+
+        // Load Theme
+        if (data.theme) {
+            currentTheme = data.theme;
+            document.querySelectorAll('.theme-card').forEach(c => {
+                if (c.dataset.theme === currentTheme) c.classList.add('active');
+                else c.classList.remove('active');
+            });
+        }
+
+        // Load Tasks
+        if (data.tasks) {
+            data.tasks.forEach(task => {
+                const parent = document.getElementById(task.columnId);
+                if (parent) {
+                    createTaskElement(task.text, parent);
+                }
+            });
+        }
+
+        // Load Timer State
+        if (data.timer) {
+            if (data.timer.timeLeft !== undefined) {
+                timeLeft = data.timer.timeLeft;
+                updateDisplay();
+            }
+            if (data.timer.isMusicOn !== undefined) {
+                isMusicOn = data.timer.isMusicOn;
+                musicToggleBtn.textContent = isMusicOn ? '[MUSIC: ON]' : '[MUSIC: OFF]';
+            }
+        }
+
+    } catch (e) {
+        console.error("Failed to load data", e);
+    }
+}
+
+// Save state before unloading (refresh/close)
+window.addEventListener('beforeunload', () => {
+    saveData();
+});
+
 // Start
+loadData(); // Load saved data
 initParticles();
 animate();
 updateDisplay();
